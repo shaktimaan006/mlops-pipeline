@@ -1,0 +1,8 @@
+ipykernel
+pandas
+scikit-learn
+nltk
+matplotlib
+wordcloud
+xgboost
+PyYAML
