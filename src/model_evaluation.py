@@ -5,6 +5,8 @@ import pickle
 import numpy as np
 from sklearn.metrics import accuracy_score,precision_score,recall_score,roc_auc_score
 import json
+from dvclive import Live
+import yaml
 
 # make logger file 
 log_dir='logs'
@@ -30,6 +32,24 @@ file_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
+def load_params(param_path:str)->dict:
+    """Load parameter from YAML file"""
+    try:
+        with open(param_path,'r') as file:
+            params=yaml.safe_load(file)
+        logger.debug("Parameter retrieved from %s",param_path)
+        return params
+    except FileNotFoundError:
+        logger.error('File not found: %s', param_path)
+        raise
+    except yaml.YAMLError as e:
+        logger.error('YAML error: %s', e)
+        raise
+    except Exception as e:
+        logger.error('Unexpected error: %s', e)
+        raise
+
+
 # now do the model evaluation
 """
 1. load model
@@ -48,9 +68,11 @@ def load_model(model_path:str):
     except FileNotFoundError:
         print('s')
         logger.error('File not found at %s',model_path)
+        raise
     except Exception as e:
         print('h')
         logger.error("Somthing went wrong while loading model")
+        raise
 
 
 def load_data(data_path:str)->pd.DataFrame:
@@ -87,6 +109,7 @@ def evaluate_model(x_test:np.ndarray,y_test:np.ndarray,model)->dict:
         return metrics
     except Exception as e:
         logger.error('Soming went wrong while evalution of model :%s',e)
+        raise
 
 # 5. save evaluation metrics
 def save_metrics(metrics,path:str):
@@ -98,10 +121,12 @@ def save_metrics(metrics,path:str):
         logger.debug("Metrics saved in :%s",path)
     except Exception as e:
         logger.error("Somthing went wrong while saving metrics")
+        raise
 
 
 def main():
     try:
+        params=load_params(param_path='params.yaml')
         print('this is main')
         model=load_model('./models/model.pkl')
         df=load_data('./data/processed/test_tfidf.csv')
@@ -110,6 +135,17 @@ def main():
         y_test=df.iloc[:,-1]
 
         metrics=evaluate_model(x_test,y_test,model)
+
+        # experiment tracking
+        with Live(save_dvc_exp=True) as live:
+            live.log_metric('accuracy',metrics['accuracy'])
+            live.log_metric('precision',metrics['precision'])
+            live.log_metric('recall', metrics['recall'])
+            live.log_metric('auc', metrics['auc'])
+            # live.log_metric('accuracy', accuracy_score(y_test, y_test))
+            # live.log_metric('precision', precision_score(y_test, y_test))
+            # live.log_metric('recall', recall_score(y_test, y_test))
+            live.log_params(params)
         save_metrics(metrics,'reports/metrics.json')
     except Exception as e:
         logger.error("Something went wrong in model evaluation file")
