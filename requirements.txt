@@ -8,3 +8,5 @@ xgboost
 PyYAML
 dvc
 dvclive
+dvc[s3]
+awscli
